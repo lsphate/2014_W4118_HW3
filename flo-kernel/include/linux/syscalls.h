@@ -76,6 +76,7 @@ struct file_handle;
 #include <linux/quota.h>
 #include <linux/key.h>
 #include <trace/syscall.h>
+#include <linux/acceleration.h>
 
 #define __SC_DECL1(t1, a1)	t1 a1
 #define __SC_DECL2(t2, a2, ...) t2 a2, __SC_DECL1(__VA_ARGS__)
@@ -857,5 +858,10 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      const struct iovec __user *rvec,
 				      unsigned long riovcnt,
 				      unsigned long flags);
+asmlinkage int sys_set_acceleration(struct dev_acceleration __user * acceleration);
+asmlinkage int sys_accevt_create(struct acc_motion __user *acceleration);
+asmlinkage int sys_accevt_wait(int event_id);
+asmlinkage int sys_accevt_signal(struct dev_acceleration __user * acceleration);
+asmlinkage int sys_accevt_destroy(int event_id);
 
 #endif
