@@ -64,9 +64,13 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 
 		/* At this point we should have valid data*/
         /* Scale it and pass it to kernel*/
+		
+		syscall(238);
+		/*
 		dbg("Acceleration: x= %0.2f, y= %0.2f, "
 			"z= %0.2f\n", buffer[i].acceleration.x,
 			buffer[i].acceleration.y, buffer[i].acceleration.z);
+		*/
 
 	}
 	return 0;
@@ -103,9 +107,10 @@ int main(int argc, char **argv)
 	}
 
 	else if (pid > 0) {
+		printf("parent dead\n");
 		exit(EXIT_SUCCESS);
 	}
-	
+	printf("im the child!\n");	
 	umask(0);
 
 	sid = setsid();
@@ -121,6 +126,10 @@ int main(int argc, char **argv)
 	if (chdirResult < 0) {
 		exit(EXIT_FAILURE);
 	}
+
+	close(0);
+	close(1);
+	close(2);
 
 	openlog("daemonOutput", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL0);
 	syslog (LOG_INFO, "STARTING DAEMON AND OUTPUTTING TO LOG!");
