@@ -389,7 +389,7 @@
 		CALL(sys_process_vm_writev)
 		CALL(sys_set_acceleration)
 		CALL(sys_accevt_create)
-/* 376 */	CALL(sys_accevt_wait)
+/* 380 */	CALL(sys_accevt_wait)
 		CALL(sys_accevt_signal)
 		CALL(sys_accevt_destroy)
 
