@@ -73,7 +73,7 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 		accelBuff->x = buffer[i].acceleration.x;
 		accelBuff->y = buffer[i].acceleration.y;
 		accelBuff->z = buffer[i].acceleration.z;
-		syscall(381, accelBuff);
+		syscall(378, accelBuff);
 		/*	
 		dbg("Acceleration: x= %0.2f, y= %0.2f, "
 			"z= %0.2f\n", buffer[i].acceleration.x,
