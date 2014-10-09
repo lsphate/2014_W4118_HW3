@@ -64,8 +64,13 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 
 		/* At this point we should have valid data*/
         /* Scale it and pass it to kernel*/
-		
-		syscall(238);
+		struct dev_acceleration *accelBuff;		
+		accelBuff = malloc(sizeof(struct dev_acceleration));
+		accelBuff->x = buffer[i].acceleration.x;
+		accelBuff->y = buffer[i].acceleration.y;
+		accelBuff->x = buffer[i].acceleration.z;
+		syscall(238, accelBuff);
+		syslog (LOG_INFO, "Made system call");
 		/*
 		dbg("Acceleration: x= %0.2f, y= %0.2f, "
 			"z= %0.2f\n", buffer[i].acceleration.x,

@@ -2,13 +2,14 @@
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
 #include <linux/acceleration.h>
+#include <asm/uaccess.h>
 
 struct dev_acceleration *data;
 
 SYSCALL_DEFINE1(set_acceleration, struct dev_acceleration __user *, acceleration)
 {
-	//struct dev_acceleration *data;
-	if (copy_from_user(data, acceleration, sizeof(dev_acceleration)))
+	struct dev_acceleration data;
+	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
                 return -EINVAL;
 	
 	printk("Congrats, your new system call has been called successfully");

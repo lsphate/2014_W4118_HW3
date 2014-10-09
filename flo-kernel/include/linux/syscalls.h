@@ -858,10 +858,10 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      const struct iovec __user *rvec,
 				      unsigned long riovcnt,
 				      unsigned long flags);
-asmlinkage int sys_set_acceleration(struct dev_acceleration __user * acceleration);
-asmlinkage int sys_accevt_create(struct acc_motion __user *acceleration);
-asmlinkage int sys_accevt_wait(int event_id);
-asmlinkage int sys_accevt_signal(struct dev_acceleration __user * acceleration);
-asmlinkage int sys_accevt_destroy(int event_id);
+asmlinkage long sys_set_acceleration(struct dev_acceleration __user * acceleration);
+asmlinkage long sys_accevt_create(struct acc_motion __user *acceleration);
+asmlinkage long sys_accevt_wait(int event_id);
+asmlinkage long sys_accevt_signal(struct dev_acceleration __user * acceleration);
+asmlinkage long sys_accevt_destroy(int event_id);
 
 #endif
