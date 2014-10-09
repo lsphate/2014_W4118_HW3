@@ -2,6 +2,8 @@
 #define _ACCELERATION_H
 
 #include <linux/unistd.h>
+#define NOISE 10
+#define WINDOW 20
 
 struct dev_acceleration{
 	int x;
