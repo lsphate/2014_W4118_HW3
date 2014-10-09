@@ -4,7 +4,7 @@
 #include <linux/acceleration.h>
 #include <asm/uaccess.h>
 
-struct dev_acceleration *data;
+struct dev_acceleration data;
 
 /*
  * Set current device acceleration in kernel.
@@ -14,10 +14,11 @@ struct dev_acceleration *data;
  */
 SYSCALL_DEFINE1(set_acceleration, struct dev_acceleration __user *, acceleration)
 {
-	struct dev_acceleration data;
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
                 return -EINVAL;
-	printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);	
+	printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
+	
+		
         return 0;
 }
 
@@ -33,6 +34,8 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	 * copy_from_user the passed acc_motion
 	 * add it to a larger data structure (hash table?)
 	 */
+
+	
         printk("Congrats, your new system call has been called successfully");
         return 0;
 }
