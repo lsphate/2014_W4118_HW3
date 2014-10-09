@@ -34,6 +34,10 @@
 
 #define __NR_set_acceleration 378
 
+/*
+ *Define time interval (ms)
+ */
+#define TIME_INTERVAL 200
 
 /* set to 1 for a bit of debug output */
 #if 1
@@ -68,10 +72,9 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 		accelBuff = malloc(sizeof(struct dev_acceleration));
 		accelBuff->x = buffer[i].acceleration.x;
 		accelBuff->y = buffer[i].acceleration.y;
-		accelBuff->x = buffer[i].acceleration.z;
-		syscall(238, accelBuff);
-		syslog (LOG_INFO, "Made system call");
-		/*
+		accelBuff->z = buffer[i].acceleration.z;
+		syscall(378, accelBuff);
+		/*	
 		dbg("Acceleration: x= %0.2f, y= %0.2f, "
 			"z= %0.2f\n", buffer[i].acceleration.x,
 			buffer[i].acceleration.y, buffer[i].acceleration.z);
@@ -85,19 +88,6 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
    where indicated */
 int main(int argc, char **argv)
 {
-	effective_sensor = -1;
-	struct sensors_module_t *sensors_module = NULL;
-	struct sensors_poll_device_t *sensors_device = NULL;
-
-	printf("Opening sensors...\n");
-	if (open_sensors(&sensors_module,
-			 &sensors_device) < 0) {
-		printf("open_sensors failed\n");
-		return EXIT_FAILURE;
-	}
-	enumerate_sensors(sensors_module);
-
-
 	/* Fill in daemon implementation around here */
 	//printf("turn me into a daemon!\n");
 	
@@ -136,12 +126,22 @@ int main(int argc, char **argv)
 	close(1);
 	close(2);
 
-	openlog("daemonOutput", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL0);
-	syslog (LOG_INFO, "STARTING DAEMON AND OUTPUTTING TO LOG!");
+	effective_sensor = -1;
+	struct sensors_module_t *sensors_module = NULL;
+	struct sensors_poll_device_t *sensors_device = NULL;
+
+	printf("Opening sensors...\n");
+	if (open_sensors(&sensors_module,
+			 &sensors_device) < 0) {
+		printf("open_sensors failed\n");
+		return EXIT_FAILURE;
+	}
+	enumerate_sensors(sensors_module);
+
 	while (1) {
 		poll_sensor_data(sensors_device);
+		usleep(TIME_INTERVAL);
 	}
-	closelog();
 	return EXIT_SUCCESS;
 }
 
