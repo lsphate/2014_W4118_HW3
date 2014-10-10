@@ -7,6 +7,7 @@
 #include <linux/log2.h>
 
 struct dev_acceleration data;
+struct acc_dlt sample;
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
 /*
@@ -59,20 +60,25 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	 * that match.
 	 */
 	struct dev_acceleration temp;
-	
+	struct dev_acceleration samples[2];
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
                 return -EINVAL;
-	/*printk("kfifo size: %d\n", kfifo_len(&accFifo));
-	printk("adding to kfifo\n");*/
+	
+	printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
 	if (kfifo_is_full(&accFifo)) {
-		printk("kfifo was full so popping\n");
 		kfifo_out(&accFifo, &temp, 1);
 	}
 	int copied;
 	copied = kfifo_in(&accFifo, &data, 1);
-	printk("copied %d\n", copied);
-	kfifo_peek(&accFifo, &temp);
-	printk("x: %d, y: %d, z: %d\n", temp.x, temp.y, temp.z);
+	
+	int sampleCount;
+	sampleCount = kfifo_out_peek(&accFifo, &samples, 2);
+	if ( sampleCount == 2 ) {
+		sample.dlt_x = abs(samples[0].x - samples[1].x);
+		sample.dlt_y = abs(samples[0].y - samples[1].y);
+		sample.dlt_z = abs(samples[0].z - samples[1].z);
+		printk("dltX %d dltY %d dltZ %d\n", sample.dlt_x, sample.dlt_y, sample.dlt_z);	
+	}
         return 0;
 }
 
