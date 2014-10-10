@@ -3,19 +3,29 @@
 #include <linux/syscalls.h>
 #include <linux/acceleration.h>
 #include <asm/uaccess.h>
+#include <linux/slab.h>
+#include <linux/list.h>
+#include <linux/idr.h>
 #include <linux/kfifo.h>
 #include <linux/log2.h>
 
+
+struct dev_acceleration data;
+struct idr accmap;
+int mapinit = 0;
 struct dev_acceleration data;
 struct acc_dlt sample;
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
+
+
 /*
  * Set current device acceleration in kernel.
  * Acceleration is pointer to sensor data in
  * user space. Acceleration value is overwritten
  * every time this is called.
  */
+
 SYSCALL_DEFINE1(set_acceleration, struct dev_acceleration __user *, acceleration)
 {
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
@@ -38,9 +48,30 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	 * copy_from_user the passed acc_motion
 	 * add it to a larger data structure (hash table?)
 	 */
-
 	
-        printk("Congrats, your new system call has been called successfully");
+	struct acc_motion *accevt;
+	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
+	if (copy_from_user(&accevt, acceleration, sizeof(struct acc_motion)))
+		return -EINVAL;
+/*
+	struct acc_motion_list newacc;
+	newacc.motionlist = *accevt;
+	INIT_LIST_HEAD(&newacc.programnode);
+        list_add_tail(&(newacc.programnode),&(headnode.programnode));
+*/
+
+	if(mapinit==0) {
+	idr_init(&accmap);
+	mapinit=1;
+	}
+	int id;
+	if(!idr_pre_get(&accmap, GFP_KERNEL))
+		return -EAGAIN;
+	if(!idr_get_new(&accmap, accevt, &id))
+		return -ENOSPC;
+
+
+	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
 
