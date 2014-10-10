@@ -28,9 +28,9 @@ struct acc_motion {
                           sum_each_sample(dlt_x + dlt_y + dlt_z) > NOISE */
 };
 
-struct acc_motion_list {
+struct acc_motion_status {
 
-	struct list_head programnode;
+	int condition;
 	struct acc_motion motionlist;
 
 };
