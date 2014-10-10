@@ -2,6 +2,8 @@
 #define _ACCELERATION_H
 
 #include <linux/unistd.h>
+#include <linux/kfifo.h>
+
 #define NOISE 10
 #define WINDOW 20
 

@@ -8,7 +8,7 @@
 #include <linux/idr.h>
 #include <linux/kfifo.h>
 #include <linux/log2.h>
-
+#include <linux/errno.h>
 
 struct dev_acceleration data;
 struct idr accmap;
@@ -90,6 +90,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	 * buffer. Notify events with frq exceeded. Unblock those
 	 * that match.
 	 */
+
 	struct dev_acceleration temp;
 	struct dev_acceleration samples[2];
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
@@ -110,6 +111,41 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		sample.dlt_z = abs(samples[0].z - samples[1].z);
 		printk("dltX %d dltY %d dltZ %d\n", sample.dlt_x, sample.dlt_y, sample.dlt_z);	
 	}
+/*
+        struct kfifo acc_data_fifo;
+	int ret, frqct;
+	unsigned int copied;
+	
+	ret = kfifo_alloc(&acc_data_fifo, 40 * sizeof(struct dev_acceleration), GFP_KERNEL);
+	if (ret)		
+		return ret;
+
+	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
+		return -EINVAL; 
+
+	if (kfifo_avail(&acc_data_fifo) < sizeof(struct dev_acceleration))
+		return -ENOSPC;
+
+	copied = kfifo_in(&acc_data_fifo, (void *) &data, sizeof(struct dev_acceleration));
+	if (copied != sizeof(struct dev_acceleration))
+		Maybe display some error here?
+
+	while (kfifo_size(&acc_data_fifo) >= (2 * sizeof(struct dev_acceleration))) {
+		struct dev_acceleration prev_data, crnt_data;
+		int dx, dy, dz;
+
+		copied = 0;
+		copied += kfifo_out(&acc_data_fifo, (void *) &prev_data, sizeof(struct dev_acceleration));
+		copied += kfifo_out_peek(&acc_data_fifo, (void *) &crnt_data, sizeof(struct dev_acceleration));
+		if (copied != (2 * sizeof(struct dev_acceleration)))
+			Maybe display some error here?
+
+		dx = crnt_data.x - prev_data.x;
+		dy = crnt_data.y - prev_data.y;
+		dz = crnt_data.z - prev_data.z;
+	}
+*/
+	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
 
