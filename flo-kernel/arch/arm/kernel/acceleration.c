@@ -9,15 +9,16 @@
 #include <linux/kfifo.h>
 #include <linux/log2.h>
 #include <linux/errno.h>
+#include <linux/wait.h>
+#include <linux/kfifo.h>
 
-struct dev_acceleration data;
 struct idr accmap;
 int mapinit = 0;
 struct dev_acceleration data;
 struct acc_dlt sample;
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
-
+struct wait_queue *acc_wq = NULL;
 
 /*
  * Set current device acceleration in kernel.
@@ -90,7 +91,6 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	 * buffer. Notify events with frq exceeded. Unblock those
 	 * that match.
 	 */
-
 	struct dev_acceleration temp;
 	struct dev_acceleration samples[2];
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
@@ -112,7 +112,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		printk("dltX %d dltY %d dltZ %d\n", sample.dlt_x, sample.dlt_y, sample.dlt_z);	
 	}
 /*
-        struct kfifo acc_data_fifo;
+        struct kfifo acc_data_fifo, sample_fifo;
 	int ret, frqct;
 	unsigned int copied;
 	
@@ -126,7 +126,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	if (kfifo_avail(&acc_data_fifo) < sizeof(struct dev_acceleration))
 		return -ENOSPC;
 
-	copied = kfifo_in(&acc_data_fifo, (void *) &data, sizeof(struct dev_acceleration));
+	copied = kfifo_put(&acc_data_fifo, (void *) &data);
 	if (copied != sizeof(struct dev_acceleration))
 		Maybe display some error here?
 
@@ -135,23 +135,33 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		int dx, dy, dz;
 
 		copied = 0;
-		copied += kfifo_out(&acc_data_fifo, (void *) &prev_data, sizeof(struct dev_acceleration));
-		copied += kfifo_out_peek(&acc_data_fifo, (void *) &crnt_data, sizeof(struct dev_acceleration));
+		copied += kfifo_get(&acc_data_fifo, (void *) &prev_data);
+		copied += kfifo_peek(&acc_data_fifo, (void *) &crnt_data);
 		if (copied != (2 * sizeof(struct dev_acceleration)))
 			Maybe display some error here?
 
 		dx = crnt_data.x - prev_data.x;
 		dy = crnt_data.y - prev_data.y;
 		dz = crnt_data.z - prev_data.z;
+		
+		if ((dx + dy + dz) > NOISE)
+			frqct++;
+		/*Should save this sample in some structure, maybe array?*/
 	}
 */
 	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
 
+
+
 SYSCALL_DEFINE1(accevt_wait, int, event_id)
 {
-       
+	/* put process into wait_queue should be done in accevt_create
+	 * in here we need to code something that ready to be wake up?
+	 */
+	
+
 	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
