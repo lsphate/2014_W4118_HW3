@@ -104,7 +104,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
                 return -EINVAL;
 	
-	printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
+	//printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
 	if (kfifo_is_full(&accFifo)) {
 		kfifo_out(&accFifo, &temp, 1);
 	}
@@ -117,7 +117,20 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		sample.dlt_x = abs(samples[0].x - samples[1].x);
 		sample.dlt_y = abs(samples[0].y - samples[1].y);
 		sample.dlt_z = abs(samples[0].z - samples[1].z);
-		printk("dltX %d dltY %d dltZ %d\n", sample.dlt_x, sample.dlt_y, sample.dlt_z);	
+		//printk("dltX %d dltY %d dltZ %d\n", sample.dlt_x, sample.dlt_y, sample.dlt_z);	
+
+		/* Check the number of samples.
+		 * If already have WINDOW samples
+		 * then remove the oldest.
+		 */
+		if (kfifo_len(&dltFifo) == WINDOW) {
+			kfifo_out(&dltFifo, &temp, 1);
+		}
+		kfifo_in(&dltFifo, &sample, 1);
+		struct acc_dlt lastSample;
+		kfifo_peek(&dltFifo, &lastSample);
+		printk("sample count %d\n", kfifo_len(&dltFifo));
+		printk("dltX %d dltY %d dltZ %d\n", lastSample.dlt_x, lastSample.dlt_y, lastSample.dlt_z);
 	}
         return 0;
 }
