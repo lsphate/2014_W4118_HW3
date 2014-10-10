@@ -18,7 +18,6 @@ struct acc_dlt sample;
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
 
-
 /*
  * Set current device acceleration in kernel.
  * Acceleration is pointer to sensor data in
@@ -53,23 +52,33 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
 	if (copy_from_user(&accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
-/*
-	struct acc_motion_list newacc;
-	newacc.motionlist = *accevt;
-	INIT_LIST_HEAD(&newacc.programnode);
-        list_add_tail(&(newacc.programnode),&(headnode.programnode));
-*/
 
-	if(mapinit==0) {
+	struct acc_motion_status *newacc;
+	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
+	newacc->condition = 0;
+	newacc->motionlist.dlt_x = accevt->dlt_x;
+	newacc->motionlist.dlt_y = accevt->dlt_y;
+	newacc->motionlist.dlt_z = accevt->dlt_z;
+	newacc->motionlist.frq = accevt->frq;
+
+
+	if(mapinit!=1) {
 	idr_init(&accmap);
 	mapinit=1;
 	}
+
+
+////////spin_lock//////////////////
+	spin_lock(&accmap.lock);
+
 	int id;
 	if(!idr_pre_get(&accmap, GFP_KERNEL))
 		return -EAGAIN;
-	if(!idr_get_new(&accmap, accevt, &id))
+	if(!idr_get_new(&accmap, newacc, &id))
 		return -ENOSPC;
 
+	spin_unlock(&accmap.lock);
+///////unlock////////////////////////////
 
 	printk("Congrats, your new system call has been called successfully");
         return 0;
