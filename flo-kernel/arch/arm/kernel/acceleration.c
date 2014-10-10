@@ -3,9 +3,12 @@
 #include <linux/syscalls.h>
 #include <linux/acceleration.h>
 #include <asm/uaccess.h>
+#include <linux/kfifo.h>
+#include <linux/log2.h>
 
 struct dev_acceleration data;
-
+DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
+DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
 /*
  * Set current device acceleration in kernel.
  * Acceleration is pointer to sensor data in
@@ -55,7 +58,19 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	 * buffer. Notify events with frq exceeded. Unblock those
 	 * that match.
 	 */
-        printk("Congrats, your new system call has been called successfully");
+	struct dev_acceleration temp;
+	
+	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
+                return -EINVAL;
+	printk("kfifo size: %d\n", kfifo_len(&accFifo));
+	printk("adding to kfifo\n");
+	if (kfifo_is_full(&accFifo)) {
+		printk("kfifo was full so popping\n");
+		kfifo_out(&accFifo, &temp, sizeof(struct dev_acceleration));
+	}
+	kfifo_in(&accFifo, &data, sizeof(struct dev_acceleration));
+	kfifo_peek(&accFifo, &temp);
+	printk("x: %d, y: %d, z: %d\n", temp.x, temp.y, temp.z);
         return 0;
 }
 
