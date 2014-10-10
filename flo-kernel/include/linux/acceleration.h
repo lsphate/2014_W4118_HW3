@@ -11,6 +11,13 @@ struct dev_acceleration{
 	int z;
 };
 
+struct acc_dlt {
+	int dlt_x;
+	int dlt_y;
+	int dlt_z;
+	int strength;
+};
+
 struct acc_motion {
 
 	unsigned int dlt_x; /* +/- around X-axis */
