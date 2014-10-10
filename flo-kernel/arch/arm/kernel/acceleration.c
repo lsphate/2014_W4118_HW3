@@ -62,13 +62,15 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	
 	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
                 return -EINVAL;
-	printk("kfifo size: %d\n", kfifo_len(&accFifo));
-	printk("adding to kfifo\n");
+	/*printk("kfifo size: %d\n", kfifo_len(&accFifo));
+	printk("adding to kfifo\n");*/
 	if (kfifo_is_full(&accFifo)) {
 		printk("kfifo was full so popping\n");
-		kfifo_out(&accFifo, &temp, sizeof(struct dev_acceleration));
+		kfifo_out(&accFifo, &temp, 1);
 	}
-	kfifo_in(&accFifo, &data, sizeof(struct dev_acceleration));
+	int copied;
+	copied = kfifo_in(&accFifo, &data, 1);
+	printk("copied %d\n", copied);
 	kfifo_peek(&accFifo, &temp);
 	printk("x: %d, y: %d, z: %d\n", temp.x, temp.y, temp.z);
         return 0;
