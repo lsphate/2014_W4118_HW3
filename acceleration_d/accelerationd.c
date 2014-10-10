@@ -70,9 +70,9 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
         /* Scale it and pass it to kernel*/
 		struct dev_acceleration *accelBuff;		
 		accelBuff = malloc(sizeof(struct dev_acceleration));
-		accelBuff->x = buffer[i].acceleration.x;
-		accelBuff->y = buffer[i].acceleration.y;
-		accelBuff->z = buffer[i].acceleration.z;
+		accelBuff->x = buffer[i].acceleration.x * 100;
+		accelBuff->y = buffer[i].acceleration.y * 100;
+		accelBuff->z = buffer[i].acceleration.z * 100;
 		syscall(381, accelBuff);
 		/*	
 		dbg("Acceleration: x= %0.2f, y= %0.2f, "
