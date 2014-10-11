@@ -30,7 +30,7 @@ struct acc_motion {
 
 struct acc_motion_status {
 	int condition;
-	struct acc_motion motionlist;
+	struct acc_motion user_acc;
 };
 
 #endif
