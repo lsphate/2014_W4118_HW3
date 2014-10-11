@@ -8,16 +8,19 @@
 #include <linux/idr.h>
 #include <linux/kfifo.h>
 #include <linux/log2.h>
+#include <linux/errno.h>
+#include <linux/wait.h>
+#include <linux/spinlock.h>
+#include <linux/types.h>
 
-
-struct dev_acceleration data;
 struct idr accmap;
 int mapinit = 0;
+spinlock_t ACC_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample;
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
-
+DECLARE_WAIT_QUEUE_HEAD(acc_wq); 
 
 /*
  * Set current device acceleration in kernel.
@@ -53,24 +56,31 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
 	if (copy_from_user(&accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
-/*
-	struct acc_motion_list newacc;
-	newacc.motionlist = *accevt;
-	INIT_LIST_HEAD(&newacc.programnode);
-        list_add_tail(&(newacc.programnode),&(headnode.programnode));
-*/
 
-	if(mapinit==0) {
-	idr_init(&accmap);
-	mapinit=1;
+	struct acc_motion_status *newacc;
+	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
+	newacc->condition = 0;
+	newacc->motionlist.dlt_x = accevt->dlt_x;
+	newacc->motionlist.dlt_y = accevt->dlt_y;
+	newacc->motionlist.dlt_z = accevt->dlt_z;
+	newacc->motionlist.frq = accevt->frq;
+
+	if(mapinit!=1) {
+		idr_init(&accmap);
+		mapinit=1;
 	}
+
+////////spin_lock//////////////////
+	spin_lock(&accmap.lock);
+
 	int id;
 	if(!idr_pre_get(&accmap, GFP_KERNEL))
 		return -EAGAIN;
-	if(!idr_get_new(&accmap, accevt, &id))
+	if(!idr_get_new(&accmap, newacc, &id))
 		return -ENOSPC;
 
-
+	spin_unlock(&accmap.lock);
+///////unlock////////////////////////////
 	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
@@ -121,14 +131,48 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		}
 		kfifo_in(&dltFifo, &sample, 1);
 	}
+	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
 
+
+
 SYSCALL_DEFINE1(accevt_wait, int, event_id)
 {
-       
-	printk("Congrats, your new system call has been called successfully");
-        return 0;
+	/* put process into wait_queue should be done in accevt_create
+	 * in here we need to code something that ready to be wake up?
+	 */
+	int check, isRunnable;
+	struct acc_container *temp;
+
+	check = 0;
+	temp = idr_find(&accmap, event_id);
+	isRunnable = &temp->condition; 
+	
+	/*Process should stuck here*/
+	repeat_waiting:
+	/*ret = wait_event_interruptible(acc_wq, isRunnable);*/
+	do {
+		DEFINE_WAIT(__wait);
+		for (;;) {
+			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
+			/*Pervent more than 1 processes access same acc_motion*/
+			spin_lock(&ACC_LOCK);
+			if (isRunnable)
+				check = 1;
+				break;
+			spin_unlock(&ACC_LOCK);
+			schedule();
+		}
+		finish_wait(&acc_wq, &__wait);
+	} while (0);
+	
+	if (check == 1) {
+		printk("Process wakes up!");
+		return 0;
+	} else {
+		goto repeat_waiting;
+	}
 }
 
 SYSCALL_DEFINE1(accevt_destroy, int, event_id)
