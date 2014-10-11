@@ -10,15 +10,17 @@
 #include <linux/log2.h>
 #include <linux/errno.h>
 #include <linux/wait.h>
-#include <linux/kfifo.h>
+#include <linux/spinlock.h>
+#include <linux/types.h>
 
 struct idr accmap;
 int mapinit = 0;
+spinlock_t ACC_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample;
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
-struct wait_queue *acc_wq = NULL;
+DECLARE_WAIT_QUEUE_HEAD(acc_wq); 
 
 /*
  * Set current device acceleration in kernel.
@@ -54,13 +56,6 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
 	if (copy_from_user(&accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
-/*
-	struct acc_motion_list newacc;
-	newacc.motionlist = *accevt;
-	INIT_LIST_HEAD(&newacc.programnode);
-        list_add_tail(&(newacc.programnode),&(headnode.programnode));
-*/
-
 	if(mapinit==0) {
 	idr_init(&accmap);
 	mapinit=1;
@@ -70,7 +65,6 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 		return -EAGAIN;
 	if(!idr_get_new(&accmap, accevt, &id))
 		return -ENOSPC;
-
 
 	printk("Congrats, your new system call has been called successfully");
         return 0;
@@ -111,44 +105,6 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		sample.dlt_z = abs(samples[0].z - samples[1].z);
 		printk("dltX %d dltY %d dltZ %d\n", sample.dlt_x, sample.dlt_y, sample.dlt_z);	
 	}
-/*
-        struct kfifo acc_data_fifo, sample_fifo;
-	int ret, frqct;
-	unsigned int copied;
-	
-	ret = kfifo_alloc(&acc_data_fifo, 40 * sizeof(struct dev_acceleration), GFP_KERNEL);
-	if (ret)		
-		return ret;
-
-	if (copy_from_user(&data, acceleration, sizeof(struct dev_acceleration)))
-		return -EINVAL; 
-
-	if (kfifo_avail(&acc_data_fifo) < sizeof(struct dev_acceleration))
-		return -ENOSPC;
-
-	copied = kfifo_put(&acc_data_fifo, (void *) &data);
-	if (copied != sizeof(struct dev_acceleration))
-		Maybe display some error here?
-
-	while (kfifo_size(&acc_data_fifo) >= (2 * sizeof(struct dev_acceleration))) {
-		struct dev_acceleration prev_data, crnt_data;
-		int dx, dy, dz;
-
-		copied = 0;
-		copied += kfifo_get(&acc_data_fifo, (void *) &prev_data);
-		copied += kfifo_peek(&acc_data_fifo, (void *) &crnt_data);
-		if (copied != (2 * sizeof(struct dev_acceleration)))
-			Maybe display some error here?
-
-		dx = crnt_data.x - prev_data.x;
-		dy = crnt_data.y - prev_data.y;
-		dz = crnt_data.z - prev_data.z;
-		
-		if ((dx + dy + dz) > NOISE)
-			frqct++;
-		/*Should save this sample in some structure, maybe array?*/
-	}
-*/
 	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
@@ -160,10 +116,37 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	/* put process into wait_queue should be done in accevt_create
 	 * in here we need to code something that ready to be wake up?
 	 */
-	
+	int check, isRunnable;
+	struct acc_container *temp;
 
-	printk("Congrats, your new system call has been called successfully");
-        return 0;
+	check = 0;
+	temp = idr_find(&accmap, event_id);
+	isRunnable = &temp->condition; 
+	
+	/*Process should stuck here*/
+	repeat_waiting:
+	/*ret = wait_event_interruptible(acc_wq, isRunnable);*/
+	do {
+		DEFINE_WAIT(__wait);
+		for (;;) {
+			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
+			/*Pervent more than 1 processes access same acc_motion*/
+			spin_lock(&ACC_LOCK);
+			if (isRunnable)
+				check = 1;
+				break;
+			spin_unlock(&ACC_LOCK);
+			schedule();
+		}
+		finish_wait(&acc_wq, &__wait);
+	} while (0);
+	
+	if (check == 1) {
+		printk("Process wakes up!");
+		return 0;
+	} else {
+		goto repeat_waiting;
+	}
 }
 
 SYSCALL_DEFINE1(accevt_destroy, int, event_id)
