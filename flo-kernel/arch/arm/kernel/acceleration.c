@@ -4,7 +4,6 @@
 #include <linux/acceleration.h>
 #include <asm/uaccess.h>
 #include <linux/slab.h>
-#include <linux/list.h>
 #include <linux/idr.h>
 #include <linux/kfifo.h>
 #include <linux/log2.h>
@@ -15,7 +14,8 @@
 
 struct idr accmap;
 int mapinit = 0;
-spinlock_t ACC_LOCK;
+spinlock_t WAIT_LOCK;
+spinlock_t DESTROY_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample;
 struct acc_dlt windowCopy[WINDOW];
@@ -162,21 +162,20 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 
 	check = 0;
 	temp = idr_find(&accmap, event_id);
-	isRunnable = temp->condition; 
+	isRunnable = (int)(&temp->condition); 
 	
 	/*Process should stuck here*/
 	repeat_waiting:
-	/*ret = wait_event_interruptible(acc_wq, isRunnable);*/
 	do {
 		DEFINE_WAIT(__wait);
 		for (;;) {
 			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
 			/*Pervent more than 1 processes access same acc_motion*/
-			spin_lock(&ACC_LOCK);
+			spin_lock(&WAIT_LOCK);
 			if (isRunnable)
 				check = 1;
 				break;
-			spin_unlock(&ACC_LOCK);
+			spin_unlock(&WAIT_LOCK);
 			schedule();
 		}
 		finish_wait(&acc_wq, &__wait);
@@ -185,13 +184,26 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	if (check == 1) {
 		printk("Process wakes up!");
 		return 0;
-	} else {
+	} else
 		goto repeat_waiting;
-	}
 }
 
 SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 {
-        printk("Congrats, your new system call has been called successfully");
+        /*Shuold cleanup: idr, acc_motion, acc_motion_status, anything else?*/
+	struct acc_motion_status *status_free;
+	struct acc_motion *motion_free;
+
+	spin_lock(&DESTROY_LOCK);
+
+	status_free = idr_find(&accmap, event_id);
+	motion_free = &status_free->motionlist;
+	idr_remove(&accmap, event_id);
+	kfree(motion_free);
+	kfree(status_free);
+	/*Any error should be handle?*/
+	spin_unlock(&DESTROY_LOCK);
+
+	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
