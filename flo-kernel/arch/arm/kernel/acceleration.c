@@ -12,13 +12,11 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-struct idr accmap;
-int mapinit = 0;
-spinlock_t WAIT_LOCK;
-spinlock_t DESTROY_LOCK;
+int idr_init;
+spinlock_t CREATE_LOCK, WAIT_LOCK, DESTROY_LOCK;
 struct dev_acceleration data;
-struct acc_dlt sample;
-struct acc_dlt windowCopy[WINDOW];
+struct acc_dlt sample, windowCopy[WINDOW];
+DEFINE_IDR(accmap);
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
 DECLARE_WAIT_QUEUE_HEAD(acc_wq);
@@ -52,14 +50,16 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	 * copy_from_user the passed acc_motion
 	 * add it to a larger data structure (hash table?)
 	 */
+	int idr_result, idr_id;
 	struct acc_motion *accevt;
 	struct acc_motion_status *newacc;
+
 	printk("kmalloc acc_motion\n");
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
 	printk("copy from user acc_motion\n");
 	if (copy_from_user(accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
-	printk("kmalloc acc_motion_status \n");
+	printk("kmalloc acc_motion_status\n");
 	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
 	printk("set acc_motion_status\n");
 	newacc->condition = 0;
@@ -71,28 +71,30 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	 * with the accevt pointer.
 	 */
 	newacc->user_acc = *accevt;
-	
-	printk("init accmap\n");	
-	if (mapinit != 1) {
+	if (idr_init != 1) {
 		idr_init(&accmap);
-		mapinit = 1;
+		idr_mapinit = 1;
 	}
-	printk("grab spin lock\n");
-	spin_lock(&accmap.lock);
-	int id;
-	printk("pre get\n");
-	if (!idr_pre_get(&accmap, GFP_KERNEL))
+	idr_result = 0;
+	idr_id = 0;
+
+idr_retry:
+	printk("idr_pre_get\n");
+	if (idr_pre_get(&accmap, GFP_KERNEL) == 0)
 		return -EAGAIN;
-	printk("pre get new\n");
-	/*
-	 * something also seems to break here
-	 */
-	if (!idr_get_new(&accmap, newacc, &id))
-		return -ENOSPC;
-	printk("releasing lock\n");
-	spin_unlock(&accmap.lock);
+
+	spin_lock(&CREATE_LOCK);
+	printk("idr_get_new\n");
+	idr_result = idr_get_new(&accmap, &newacc, &idr_id);
+	spin_unlock(&CREATE_LOCK);
+
+	if (idr_result < 0) {
+		if (result == -EAGAIN)
+			goto idr_retry;
+		return idr_result;
+	}
 	printk("Congrats, your new system call has been called successfully");
-	return 0;
+	return id;
 }
 
 /* take sensor data from user and store in kernel
