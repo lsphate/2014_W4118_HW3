@@ -197,7 +197,7 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 	spin_lock(&DESTROY_LOCK);
 
 	status_free = idr_find(&accmap, event_id);
-	motion_free = &status_free->motionlist;
+	motion_free = &status_free->user_acc;
 	idr_remove(&accmap, event_id);
 	kfree(motion_free);
 	kfree(status_free);
