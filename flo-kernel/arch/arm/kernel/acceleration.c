@@ -12,7 +12,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-int idr_init;
+int map_init;
 spinlock_t CREATE_LOCK, WAIT_LOCK, DESTROY_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample, windowCopy[WINDOW];
@@ -50,51 +50,41 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	 * copy_from_user the passed acc_motion
 	 * add it to a larger data structure (hash table?)
 	 */
-	int idr_result, idr_id;
+	int map_result, map_id;
 	struct acc_motion *accevt;
 	struct acc_motion_status *newacc;
 
-	printk("kmalloc acc_motion\n");
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
-	printk("copy from user acc_motion\n");
 	if (copy_from_user(accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
-	printk("kmalloc acc_motion_status\n");
 	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
-	printk("set acc_motion_status\n");
 	newacc->condition = 0;
-	printk("copying acc_motion\n");
-	/*
-	 * This line causes a kernel panic
-	 * I changed it a bit to avoid having to set every value
-	 * one by one. Should work. I think something is wrong
-	 * with the accevt pointer.
-	 */
 	newacc->user_acc = *accevt;
-	if (idr_init != 1) {
-		idr_init(&accmap);
-		idr_mapinit = 1;
-	}
-	idr_result = 0;
-	idr_id = 0;
 
-idr_retry:
+	if (map_init != 1) {
+		idr_init(&accmap);
+		map_init = 1;
+	}
+	map_result = 0;
+	map_id = 0;
+
+map_retry:
 	printk("idr_pre_get\n");
 	if (idr_pre_get(&accmap, GFP_KERNEL) == 0)
 		return -EAGAIN;
 
 	spin_lock(&CREATE_LOCK);
 	printk("idr_get_new\n");
-	idr_result = idr_get_new(&accmap, &newacc, &idr_id);
+	map_result = idr_get_new(&accmap, &newacc, &map_id);
 	spin_unlock(&CREATE_LOCK);
 
-	if (idr_result < 0) {
-		if (result == -EAGAIN)
-			goto idr_retry;
-		return idr_result;
+	if (map_result < 0) {
+		if (map_result == -EAGAIN)
+			goto map_retry;
+		return map_result;
 	}
 	printk("Congrats, your new system call has been called successfully");
-	return id;
+	return map_id;
 }
 
 /* take sensor data from user and store in kernel
@@ -113,6 +103,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	 * that match.
 	 */
 	int copied, sampleCount;
+	int numSamples, frq;
 	struct dev_acceleration temp;
 	struct dev_acceleration samples[2];
 
@@ -137,19 +128,20 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		 * If already have WINDOW samples
 		 * then remove the oldest.
 		 */
-		int numSamples, i, frq;
 		struct acc_dlt tempDlt;
 
 		if (kfifo_len(&dltFifo) == WINDOW)
 			kfifo_out(&dltFifo, &tempDlt, 1);
 		kfifo_in(&dltFifo, &sample, 1);
 		numSamples = kfifo_out_peek(&dltFifo, windowCopy, WINDOW);
+		frq = 0;
 		/*
 		 * TODO: put this in a for loop that loops
 		 * through the hashmap holding each
 		 * acc_motion
 		 */
-		frq = 0;
+		int i;
+
 		for (i = 0; i < numSamples; i++) {
 			if (windowCopy[i].strength > NOISE)
 				frq++;
