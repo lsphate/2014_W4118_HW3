@@ -18,7 +18,7 @@ int mapinit = 0;
 spinlock_t ACC_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample;
-struct acc_dlt samples[WINDOW];
+struct acc_dlt windowCopy[WINDOW];
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
 DECLARE_WAIT_QUEUE_HEAD(acc_wq); 
@@ -61,10 +61,10 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	struct acc_motion_status *newacc;
 	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
 	newacc->condition = 0;
-	newacc->motionlist.dlt_x = accevt->dlt_x;
-	newacc->motionlist.dlt_y = accevt->dlt_y;
-	newacc->motionlist.dlt_z = accevt->dlt_z;
-	newacc->motionlist.frq = accevt->frq;
+	newacc->user_acc.dlt_x = accevt->dlt_x;
+	newacc->user_acc.dlt_y = accevt->dlt_y;
+	newacc->user_acc.dlt_z = accevt->dlt_z;
+	newacc->user_acc.frq = accevt->frq;
 
 	if(mapinit!=1) {
 		idr_init(&accmap);
@@ -132,8 +132,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		}
 		kfifo_in(&dltFifo, &sample, 1);
 		int numSamples;
-		numSamples = kfifo_peek(&dltFifo, &samples);
-		printk("number of copied samples %d", numSamples);
+		numSamples = kfifo_out_peek(&dltFifo, windowCopy, WINDOW);
 	}
         return 0;
 }
@@ -146,11 +145,11 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	 * in here we need to code something that ready to be wake up?
 	 */
 	int check, isRunnable;
-	struct acc_container *temp;
+	struct acc_motion_status *temp;
 
 	check = 0;
 	temp = idr_find(&accmap, event_id);
-	isRunnable = &temp->condition; 
+	isRunnable = temp->condition; 
 	
 	/*Process should stuck here*/
 	repeat_waiting:
