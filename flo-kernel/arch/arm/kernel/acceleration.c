@@ -149,12 +149,12 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	/* put process into wait_queue should be done in accevt_create
 	 * in here we need to code something that ready to be wake up?
 	 */
-	int check, isRunnable;
+	int check, *isRunnable;
 	struct acc_motion_status *temp;
 
 	check = 0;
 	temp = idr_find(&accmap, event_id);
-	isRunnable = (int)(&temp->condition);
+	isRunnable = &temp->condition;
 
 	/*Process should stuck here*/
 repeat_waiting:
@@ -165,7 +165,7 @@ repeat_waiting:
 			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
 			/*Pervent more than 1 processes access same acc_motion*/
 			spin_lock(&WAIT_LOCK);
-			if (isRunnable)
+			if (*isRunnable == 1)
 				check = 1;
 				break;
 			spin_unlock(&WAIT_LOCK);
