@@ -18,6 +18,7 @@ int mapinit = 0;
 spinlock_t ACC_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample;
+struct acc_dlt samples[WINDOW];
 DEFINE_KFIFO(accFifo, struct dev_acceleration, 2);
 DEFINE_KFIFO(dltFifo, struct acc_dlt, roundup_pow_of_two(20));
 DECLARE_WAIT_QUEUE_HEAD(acc_wq); 
@@ -130,8 +131,10 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 			kfifo_out(&dltFifo, &tempDlt, 1);
 		}
 		kfifo_in(&dltFifo, &sample, 1);
+		int numSamples;
+		numSamples = kfifo_peek(&dltFifo, &samples);
+		printk("number of copied samples %d", numSamples);
 	}
-	printk("Congrats, your new system call has been called successfully");
         return 0;
 }
 
