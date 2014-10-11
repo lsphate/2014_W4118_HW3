@@ -54,29 +54,42 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	 */
 	struct acc_motion *accevt;
 	struct acc_motion_status *newacc;
-
+	printk("kmalloc acc_motion\n");
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
-	if (copy_from_user(&accevt, acceleration, sizeof(struct acc_motion)))
+	printk("copy from user acc_motion\n");
+	if (copy_from_user(accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
+	printk("kmalloc acc_motion_status \n");
 	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
+	printk("set acc_motion_status\n");
 	newacc->condition = 0;
-	newacc->user_acc.dlt_x = accevt->dlt_x;
-	newacc->user_acc.dlt_y = accevt->dlt_y;
-	newacc->user_acc.dlt_z = accevt->dlt_z;
-	newacc->user_acc.frq = accevt->frq;
-
+	printk("copying acc_motion\n");
+	/*
+	 * This line causes a kernel panic
+	 * I changed it a bit to avoid having to set every value
+	 * one by one. Should work. I think something is wrong
+	 * with the accevt pointer.
+	 */
+	newacc->user_acc = *accevt;
+	
+	printk("init accmap\n");	
 	if (mapinit != 1) {
 		idr_init(&accmap);
 		mapinit = 1;
 	}
-
+	printk("grab spin lock\n");
 	spin_lock(&accmap.lock);
 	int id;
-
+	printk("pre get\n");
 	if (!idr_pre_get(&accmap, GFP_KERNEL))
 		return -EAGAIN;
+	printk("pre get new\n");
+	/*
+	 * something also seems to break here
+	 */
 	if (!idr_get_new(&accmap, newacc, &id))
 		return -ENOSPC;
+	printk("releasing lock\n");
 	spin_unlock(&accmap.lock);
 	printk("Congrats, your new system call has been called successfully");
 	return 0;
