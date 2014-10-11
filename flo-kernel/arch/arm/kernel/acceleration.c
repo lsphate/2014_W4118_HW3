@@ -133,6 +133,19 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		kfifo_in(&dltFifo, &sample, 1);
 		int numSamples;
 		numSamples = kfifo_out_peek(&dltFifo, windowCopy, WINDOW);
+		/*
+		 * TODO: put this in a for loop that loops
+		 * through the hashmap holding each
+		 * acc_motion
+		 */
+		int i;
+		int frq = 0;
+		for (i=0; i<numSamples; i++) {
+			if(windowCopy[i].strength > NOISE) {
+				frq++;
+			}		
+		}
+		printk("frq: %d\n", frq);
 	}
         return 0;
 }
