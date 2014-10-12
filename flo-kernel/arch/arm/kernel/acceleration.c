@@ -90,6 +90,12 @@ map_retry:
 	return map_id;
 }
 
+int checkMotion_cb(int id, void *ptr, void *data) {
+	struct acc_motion_status *currMotion = ptr;
+	struct acc_dlt *windowSamples;
+	printk("%d %d %d %d\n", currMotion->user_acc.dlt_x, currMotion->user_acc.dlt_y, currMotion->user_acc.dlt_z, currMotion->user_acc.frq);
+	return 0;
+}
 /* take sensor data from user and store in kernel
  * calculate the motion event
  * notify all events with matching event
@@ -113,7 +119,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	if (copy_from_user(&data,
 			acceleration, sizeof(struct dev_acceleration)))
 		return -EINVAL;
-	printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
+	//printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
 	if (kfifo_is_full(&accFifo))
 		kfifo_out(&accFifo, &temp, 1);
 
@@ -124,9 +130,9 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		sample.dlt_y = abs(samples[0].y - samples[1].y);
 		sample.dlt_z = abs(samples[0].z - samples[1].z);
 		sample.strength = sample.dlt_x + sample.dlt_y + sample.dlt_z;
-		printk("dltX %d dltY %d dltZ %d str %d\n",
+		/*printk("dltX %d dltY %d dltZ %d str %d\n",
 		sample.dlt_x, sample.dlt_y, sample.dlt_z, sample.strength);
-
+		*/
 		/* Check the number of samples.
 		 * If already have WINDOW samples
 		 * then remove the oldest.
@@ -143,13 +149,13 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		 * through the hashmap holding each
 		 * acc_motion
 		 */
-		int i;
-
+		/*int i;
+		
 		for (i = 0; i < numSamples; i++) {
 			if (windowCopy[i].strength > NOISE)
 				frq++;
-		}
-		printk("frq: %d\n", frq);
+		}*/
+		idr_for_each(&accmap, &checkMotion_cb, windowCopy);
 	}
 	return 0;
 }
