@@ -55,9 +55,16 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	struct acc_motion_status *newacc;
 
 	accevt = kmalloc(sizeof(struct acc_motion), GFP_KERNEL);
+	if (!accevt)
+		return -EFAULT;
+
 	if (copy_from_user(accevt, acceleration, sizeof(struct acc_motion)))
 		return -EINVAL;
+
 	newacc = kmalloc(sizeof(struct acc_motion_status), GFP_KERNEL);
+	if (!newacc)
+		return -EFAULT;
+
 	newacc->condition = 0;
 	newacc->user_acc = *accevt;
 
@@ -69,21 +76,17 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	map_id = 0;
 
 map_retry:
-	printk("idr_pre_get\n");
 	if (idr_pre_get(&accmap, GFP_KERNEL) == 0)
-		return -EAGAIN;
+		return -ENOMEM;
 
 	spin_lock(&CREATE_LOCK);
-	printk("idr_get_new\n");
-	map_result = idr_get_new(&accmap, &newacc, &map_id);
+	map_result = idr_get_new(&accmap, newacc, &map_id);
 	spin_unlock(&CREATE_LOCK);
-
 	if (map_result < 0) {
 		if (map_result == -EAGAIN)
 			goto map_retry;
 		return map_result;
 	}
-	printk("Congrats, your new system call has been called successfully");
 	return map_id;
 }
 
@@ -196,15 +199,12 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 	struct acc_motion *motion_free;
 
 	spin_lock(&DESTROY_LOCK);
-
 	status_free = idr_find(&accmap, event_id);
 	motion_free = &status_free->user_acc;
-	idr_remove(&accmap, event_id);
+
 	kfree(motion_free);
 	kfree(status_free);
-	/*Any error should be handle?*/
+	idr_remove(&accmap, event_id);
 	spin_unlock(&DESTROY_LOCK);
-
-	printk("Congrats, your new system call has been called successfully");
 	return 0;
 }
