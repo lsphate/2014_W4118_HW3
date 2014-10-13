@@ -13,7 +13,7 @@
 #include <linux/types.h>
 
 int map_init, numSamples;
-spinlock_t CREATE_LOCK, WAIT_LOCK, DESTROY_LOCK;
+spinlock_t CREATE_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample, windowCopy[WINDOW];
 DEFINE_IDR(accmap);
@@ -123,8 +123,7 @@ int checkMotion_cb(int id, void *ptr, void *data)
 		printk("DETECTED MOTION!\n");
 		currMotion->condition = 1;
 		wake_up(&(currMotion->eventWQ));
-	}
-	else
+	} else
 		currMotion->condition = 0;
 	return 0;
 }
@@ -187,29 +186,25 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	int check, *isRunnable;
 	struct acc_motion_status *temp;
 
-	printk("Start initialize!\n");
+	printk("Prepare ot wait.\n");
 	check = 0;
 	temp = idr_find(&accmap, event_id);
 	isRunnable = &temp->condition;
-/*
-	printk("isRunnable = %d!\n", *isRunnable);
-	*isRunnable = 1;
-	printk("isRunnable = %d!\n", *isRunnable);
-*/
 	/*Process should stuck here*/
 repeat_waiting:
 	do {
 		DEFINE_WAIT(__wait);
 
 		for (;;) {
-			prepare_to_wait(&(temp->eventWQ), &__wait, TASK_INTERRUPTIBLE);
-			spin_lock(&WAIT_LOCK);
+			prepare_to_wait(&(temp->eventWQ),
+					&__wait, TASK_INTERRUPTIBLE);
+			spin_lock(&CREATE_LOCK);
 			if (*isRunnable == 1) {
-				spin_unlock(&WAIT_LOCK);
+				spin_unlock(&CREATE_LOCK);
 				check = 1;
 				break;
 			}
-			spin_unlock(&WAIT_LOCK);
+			spin_unlock(&CREATE_LOCK);
 			if (!signal_pending(current)) {
 				schedule();
 				continue;
@@ -219,10 +214,11 @@ repeat_waiting:
 		finish_wait(&(temp->eventWQ), &__wait);
 	} while (0);
 
-	if (check != 1)
+	if (check != 1) {
+		printk("%d Condition not true.\n", event_id);
 		goto repeat_waiting;
-	else {
-		printk("Process wakes up!\n");
+	} else {
+		printk("Process %d wakes up!\n", event_id);
 		return 0;
 	}
 }
@@ -230,16 +226,19 @@ repeat_waiting:
 SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 {
 	/*Shuold cleanup: idr, acc_motion, acc_motion_status, anything else?*/
+	printk("Destroy starts.\n");
 	struct acc_motion_status *status_free;
-	struct acc_motion *motion_free;
+	/*struct acc_motion *motion_free;*/
 
-	spin_lock(&DESTROY_LOCK);
+	spin_lock(&CREATE_LOCK);
 	status_free = idr_find(&accmap, event_id);
-	motion_free = &status_free->user_acc;
+	/*motion_free = &status_free->user_acc;*/
+	printk("Get entities to remove.\n");
 
 	idr_remove(&accmap, event_id);
-	kfree(motion_free);
+	/*kfree(motion_free);*/
 	kfree(status_free);
-	spin_unlock(&DESTROY_LOCK);
+	printk("Destroy complete.\n");
+	spin_unlock(&CREATE_LOCK);
 	return 0;
 }

@@ -3,6 +3,8 @@
 
 #include <linux/unistd.h>
 
+void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq);
+
 struct acc_motion {
 
      unsigned int dlt_x; /* +/- around X-axis */
