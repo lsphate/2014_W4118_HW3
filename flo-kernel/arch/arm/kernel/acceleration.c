@@ -182,29 +182,30 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	isRunnable = &temp->condition;
 
 	/*Process should stuck here*/
-repeat_waiting:
-	do {
+//repeat_waiting:
+//	do {
 		DEFINE_WAIT(__wait);
 
-		for (;;) {
+//		for (;;) {
+		while (*isRunnable == 0)
 			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
 			/*Pervent more than 1 processes access same acc_motion*/
-			spin_lock(&WAIT_LOCK);
+		/*	spin_lock(&WAIT_LOCK);
 			if (*isRunnable == 1)
 				check = 1;
 				break;
-			spin_unlock(&WAIT_LOCK);
+			spin_unlock(&WAIT_LOCK); */
 			schedule();
-		}
+//		}
 		finish_wait(&acc_wq, &__wait);
-	} while (0);
+//	} while (0);
 
-	if (check != 1)
-		goto repeat_waiting;
-	else {
+//	if (check != 1)
+//		goto repeat_waiting;
+//	else {
 		printk("Process wakes up!");
 		return 0;
-	}
+//	}
 }
 
 SYSCALL_DEFINE1(accevt_destroy, int, event_id)
