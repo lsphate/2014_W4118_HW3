@@ -13,6 +13,6 @@ int main(int argc, char **argv)
 
 	result = syscall(379, &motionTest);
 	printf("acc_motion ID: %d\n", result);
-	//syscall(382, result);
+	/*syscall(380, result);*/
 	return 0;
 }
