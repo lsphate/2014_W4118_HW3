@@ -2,6 +2,7 @@
 #define _ACCELERATION_H
 
 #include <linux/unistd.h>
+#include <linux/wait.h>
 
 #define NOISE 10
 #define WINDOW 20
@@ -32,6 +33,7 @@ struct acc_motion {
 struct acc_motion_status {
 	int condition;
 	struct acc_motion user_acc;
+	wait_queue_head_t eventWQ;
 };
 
 #endif

@@ -67,6 +67,7 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 
 	newacc->condition = 0;
 	newacc->user_acc = *accevt;
+	init_waitqueue_head(&(newacc->eventWQ));
 
 	if (map_init != 1) {
 		idr_init(&accmap);
@@ -118,8 +119,13 @@ int checkMotion_cb(int id, void *ptr, void *data)
 	 * activate the processes waiting
 	 * on this event
 	 */
-	if (frq >= currMotion->user_acc.frq)
+	if (frq >= currMotion->user_acc.frq) {
 		printk("DETECTED MOTION!\n");
+		currMotion->condition = 1;
+		wake_up(&(currMotion->eventWQ));
+	}
+	else
+		currMotion->condition = 0;
 	return 0;
 }
 /* take sensor data from user and store in kernel
@@ -196,7 +202,7 @@ repeat_waiting:
 		DEFINE_WAIT(__wait);
 
 		for (;;) {
-			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
+			prepare_to_wait(&(temp->eventWQ), &__wait, TASK_INTERRUPTIBLE);
 			spin_lock(&WAIT_LOCK);
 			if (*isRunnable == 1) {
 				spin_unlock(&WAIT_LOCK);
@@ -210,7 +216,7 @@ repeat_waiting:
 			}
 			break;
 		}
-		finish_wait(&acc_wq, &__wait);
+		finish_wait(&(temp->eventWQ), &__wait);
 	} while (0);
 
 	if (check != 1)
