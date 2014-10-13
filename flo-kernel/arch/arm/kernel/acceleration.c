@@ -12,7 +12,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-int map_init;
+int map_init, numSamples;
 spinlock_t CREATE_LOCK, WAIT_LOCK, DESTROY_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample, windowCopy[WINDOW];
@@ -92,8 +92,30 @@ map_retry:
 
 int checkMotion_cb(int id, void *ptr, void *data) {
 	struct acc_motion_status *currMotion = ptr;
-	struct acc_dlt *windowSamples;
-	printk("%d %d %d %d\n", currMotion->user_acc.dlt_x, currMotion->user_acc.dlt_y, currMotion->user_acc.dlt_z, currMotion->user_acc.frq);
+	struct acc_dlt *windowSamples = data;
+	int i;
+	int frq = 0;
+	//printk("%d %d %d %d\n", currMotion->user_acc.dlt_x, currMotion->user_acc.dlt_y, currMotion->user_acc.dlt_z, currMotion->user_acc.frq);
+	
+	for (i = 0; i < numSamples; i++) {
+		if (windowSamples[i].strength > NOISE) {
+			if (windowSamples[i].dlt_x < currMotion->user_acc.dlt_x)
+				continue;
+			if (windowSamples[i].dlt_y < currMotion->user_acc.dlt_y)
+				continue;
+			if (windowSamples[i].dlt_z < currMotion->user_acc.dlt_z)
+				continue;
+			frq++;
+		}
+	}
+	//printk("FRQ: %d\n", frq);
+	/*
+	 * TODO: instead of print statement
+	 * activate the processes waiting
+	 * on this event
+	 */
+	if (frq >= currMotion->user_acc.frq)
+		printk("DETECTED MOTION!\n");
 	return 0;
 }
 /* take sensor data from user and store in kernel
@@ -112,7 +134,6 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	 * that match.
 	 */
 	int copied, sampleCount;
-	int numSamples, frq;
 	struct dev_acceleration temp;
 	struct dev_acceleration samples[2];
 
@@ -143,18 +164,6 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 			kfifo_out(&dltFifo, &tempDlt, 1);
 		kfifo_in(&dltFifo, &sample, 1);
 		numSamples = kfifo_out_peek(&dltFifo, windowCopy, WINDOW);
-		frq = 0;
-		/*
-		 * TODO: put this in a for loop that loops
-		 * through the hashmap holding each
-		 * acc_motion
-		 */
-		/*int i;
-		
-		for (i = 0; i < numSamples; i++) {
-			if (windowCopy[i].strength > NOISE)
-				frq++;
-		}*/
 		idr_for_each(&accmap, &checkMotion_cb, windowCopy);
 	}
 	return 0;
