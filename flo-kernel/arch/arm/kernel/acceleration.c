@@ -90,13 +90,17 @@ map_retry:
 	return map_id;
 }
 
-int checkMotion_cb(int id, void *ptr, void *data) {
+int checkMotion_cb(int id, void *ptr, void *data)
+{
 	struct acc_motion_status *currMotion = ptr;
 	struct acc_dlt *windowSamples = data;
 	int i;
 	int frq = 0;
-	//printk("%d %d %d %d\n", currMotion->user_acc.dlt_x, currMotion->user_acc.dlt_y, currMotion->user_acc.dlt_z, currMotion->user_acc.frq);
-	
+	/*printk("%d %d %d %d\n", currMotion->user_acc.dlt_x,
+					currMotion->user_acc.dlt_y,
+					currMotion->user_acc.dlt_z,
+					currMotion->user_acc.frq);*/
+
 	for (i = 0; i < numSamples; i++) {
 		if (windowSamples[i].strength > NOISE) {
 			if (windowSamples[i].dlt_x < currMotion->user_acc.dlt_x)
@@ -108,7 +112,7 @@ int checkMotion_cb(int id, void *ptr, void *data) {
 			frq++;
 		}
 	}
-	//printk("FRQ: %d\n", frq);
+	/*printk("FRQ: %d\n", frq);*/
 	/*
 	 * TODO: instead of print statement
 	 * activate the processes waiting
@@ -140,7 +144,7 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 	if (copy_from_user(&data,
 			acceleration, sizeof(struct dev_acceleration)))
 		return -EINVAL;
-	//printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
+	/*printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);*/
 	if (kfifo_is_full(&accFifo))
 		kfifo_out(&accFifo, &temp, 1);
 
@@ -177,10 +181,15 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	int check, *isRunnable;
 	struct acc_motion_status *temp;
 
+	printk("Start initialize!\n");
 	check = 0;
 	temp = idr_find(&accmap, event_id);
 	isRunnable = &temp->condition;
-	
+/*
+	printk("isRunnable = %d!\n", *isRunnable);
+	*isRunnable = 1;
+	printk("isRunnable = %d!\n", *isRunnable);
+*/
 	/*Process should stuck here*/
 repeat_waiting:
 	do {
@@ -188,15 +197,18 @@ repeat_waiting:
 
 		for (;;) {
 			prepare_to_wait(&acc_wq, &__wait, TASK_INTERRUPTIBLE);
-			/*Pervent more than 1 processes access same acc_motion*/
 			spin_lock(&WAIT_LOCK);
-			if (*isRunnable == 1){
-				check = 1;
+			if (*isRunnable == 1) {
 				spin_unlock(&WAIT_LOCK);
+				check = 1;
 				break;
 			}
-			spin_unlock(&WAIT_LOCK); 
-			schedule();
+			spin_unlock(&WAIT_LOCK);
+			if (!signal_pending(current)) {
+				schedule();
+				continue;
+			}
+			break;
 		}
 		finish_wait(&acc_wq, &__wait);
 	} while (0);
@@ -204,7 +216,7 @@ repeat_waiting:
 	if (check != 1)
 		goto repeat_waiting;
 	else {
-		printk("Process wakes up!");
+		printk("Process wakes up!\n");
 		return 0;
 	}
 }
