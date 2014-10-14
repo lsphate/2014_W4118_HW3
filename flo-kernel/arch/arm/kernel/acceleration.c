@@ -113,11 +113,11 @@ int checkMotion_cb(int id, void *ptr, void *data)
 			frq++;
 		}
 	}
-	/*printk("FRQ: %d\n", frq);*/
 	if (frq >= currMotion->user_acc.frq) {
-		printk("DETECTED MOTION!\n");
 		currMotion->condition = 1;
+		spin_lock(&WQ_LOCK);
 		wake_up(&(currMotion->eventWQ));
+		spin_unlock(&WQ_LOCK);
 	} else
 		currMotion->condition = 0;
 	return 0;
