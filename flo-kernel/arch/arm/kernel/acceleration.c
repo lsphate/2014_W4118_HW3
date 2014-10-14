@@ -203,7 +203,6 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 			schedule();
 			continue;
 		}
-		/* WHY DO WE BREAK HERE?*/
 			break;
 	}
 	finish_wait(&(temp->eventWQ), &__wait);
@@ -219,7 +218,7 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 
 	spin_lock(&IDR_LOCK);
 	status_free = idr_find(&accmap, event_id);
-	if(atomic_read(&(status_free->numProc))) {
+	if(!atomic_read(&(status_free->numProc))) {
 		idr_remove(&accmap, event_id);
 		kfree(status_free);
 		printk("Destroy complete.\n");
