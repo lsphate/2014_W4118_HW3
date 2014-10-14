@@ -35,7 +35,7 @@ SYSCALL_DEFINE1(set_acceleration,
 	if (copy_from_user(&data,
 			acceleration, sizeof(struct dev_acceleration)))
 		return -EINVAL;
-	printk("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
+	pr_debug("x: %d, y: %d, z: %d\n", data.x, data.y, data.z);
 	return 0;
 }
 
@@ -150,6 +150,9 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		kfifo_out(&accFifo, &temp, 1);
 
 	copied = kfifo_in(&accFifo, &data, 1);
+	if (copied != 1)
+		pr_debug("Warning! Short writting detected.\n");
+
 	sampleCount = kfifo_out_peek(&accFifo, &samples, 2);
 	if (sampleCount == 2) {
 		sample.dlt_x = abs(samples[0].x - samples[1].x);
@@ -172,7 +175,8 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 		spin_lock(&IDR_LOCK);
 		idr_for_each(&accmap, &checkMotion_cb, windowCopy);
 		spin_unlock(&IDR_LOCK);
-	}
+	} else
+		pr_debug("Warning! Incorrect reading detected.\n");
 	return 0;
 }
 
@@ -185,6 +189,8 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	struct acc_motion_status *temp;
 
 	temp = idr_find(&accmap, event_id);
+	if (!temp)
+		return -EINVAL;
 	isRunnable = &temp->condition;
 	atomic_inc(&(temp->numProc));
 	/*Process should stuck here*/
@@ -203,12 +209,12 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 			schedule();
 			continue;
 		}
-			break;
+		break;
 	}
 	finish_wait(&(temp->eventWQ), &__wait);
 	atomic_dec(&(temp->numProc));
 
-	printk("Process %d wakes up!\n", event_id);
+	pr_debug("Process %d wakes up!\n", event_id);
 	return 0;
 }
 
@@ -218,10 +224,10 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 
 	spin_lock(&IDR_LOCK);
 	status_free = idr_find(&accmap, event_id);
-	if(!atomic_read(&(status_free->numProc))) {
+	if (!atomic_read(&(status_free->numProc))) {
 		idr_remove(&accmap, event_id);
 		kfree(status_free);
-		printk("Destroy complete.\n");
+		pr_debug("Destroy complete.\n");
 	}
 	spin_unlock(&IDR_LOCK);
 
