@@ -12,7 +12,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-int map_init, numSamples;
+int map_init, map_ct, numSamples;
 spinlock_t CREATE_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample, windowCopy[WINDOW];
@@ -88,6 +88,7 @@ map_retry:
 			goto map_retry;
 		return map_result;
 	}
+	map_ct++;
 	return map_id;
 }
 
@@ -228,17 +229,24 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 	/*Shuold cleanup: idr, acc_motion, acc_motion_status, anything else?*/
 	printk("Destroy starts.\n");
 	struct acc_motion_status *status_free;
-	/*struct acc_motion *motion_free;*/
 
 	spin_lock(&CREATE_LOCK);
 	status_free = idr_find(&accmap, event_id);
-	/*motion_free = &status_free->user_acc;*/
 	printk("Get entities to remove.\n");
 
 	idr_remove(&accmap, event_id);
-	/*kfree(motion_free);*/
+	map_ct--;
 	kfree(status_free);
 	printk("Destroy complete.\n");
 	spin_unlock(&CREATE_LOCK);
+
+	if (map_ct == 0) {
+		int i;
+		struct acc_dlt temp;
+
+		printk("Last one must clean up.\n");
+		for (i = 0; i < WINDOW; i++)
+			windowCopy[i] = temp;
+	}
 	return 0;
 }
