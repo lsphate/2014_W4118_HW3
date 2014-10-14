@@ -11,8 +11,9 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <asm/atomic.h>
 
-int map_init, map_ct, numSamples;
+int map_init, numSamples;
 spinlock_t IDR_LOCK, WQ_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample, windowCopy[WINDOW];
@@ -67,6 +68,7 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 
 	newacc->condition = 0;
 	newacc->user_acc = *accevt;
+	atomic_set(&(newacc->numProc), 0);
 	init_waitqueue_head(&(newacc->eventWQ));
 
 	if (map_init != 1) {
@@ -87,7 +89,6 @@ map_retry:
 			goto map_retry;
 		return map_result;
 	}
-	map_ct++;
 	return map_id;
 }
 
@@ -180,69 +181,50 @@ SYSCALL_DEFINE1(accevt_wait, int, event_id)
 	/* put process into wait_queue should be done in accevt_create
 	 * in here we need to code something that ready to be wake up?
 	 */
-	int check, *isRunnable;
+	int *isRunnable;
 	struct acc_motion_status *temp;
 
-	printk("Prepare ot wait.\n");
-	check = 0;
 	temp = idr_find(&accmap, event_id);
 	isRunnable = &temp->condition;
+	atomic_inc(&(temp->numProc));
 	/*Process should stuck here*/
-repeat_waiting:
-	do {
-		DEFINE_WAIT(__wait);
+	DEFINE_WAIT(__wait);
 
-		for (;;) {
-			prepare_to_wait(&(temp->eventWQ),
-					&__wait, TASK_INTERRUPTIBLE);
-			spin_lock(&WQ_LOCK);
-			if (*isRunnable == 1) {
-				spin_unlock(&WQ_LOCK);
-				check = 1;
-				break;
-			}
+	for (;;) {
+		prepare_to_wait(&(temp->eventWQ),
+				&__wait, TASK_INTERRUPTIBLE);
+		spin_lock(&WQ_LOCK);
+		if (*isRunnable == 1) {
 			spin_unlock(&WQ_LOCK);
-			if (!signal_pending(current)) {
-				schedule();
-				continue;
-			}
 			break;
 		}
-		finish_wait(&(temp->eventWQ), &__wait);
-	} while (0);
-
-	if (check != 1) {
-		printk("%d Condition not true.\n", event_id);
-		goto repeat_waiting;
-	} else {
-		printk("Process %d wakes up!\n", event_id);
-		return 0;
+		spin_unlock(&WQ_LOCK);
+		if (!signal_pending(current)) {
+			schedule();
+			continue;
+		}
+		/* WHY DO WE BREAK HERE?*/
+			break;
 	}
+	finish_wait(&(temp->eventWQ), &__wait);
+	atomic_dec(&(temp->numProc));
+
+	printk("Process %d wakes up!\n", event_id);
+	return 0;
 }
 
 SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 {
-	/*Shuold cleanup: idr, acc_motion, acc_motion_status, anything else?*/
-	printk("Destroy starts.\n");
 	struct acc_motion_status *status_free;
 
 	spin_lock(&IDR_LOCK);
 	status_free = idr_find(&accmap, event_id);
-	printk("Get entities to remove.\n");
-
-	idr_remove(&accmap, event_id);
-	map_ct--;
-	kfree(status_free);
-	printk("Destroy complete.\n");
+	if(atomic_read(&(status_free->numProc))) {
+		idr_remove(&accmap, event_id);
+		kfree(status_free);
+		printk("Destroy complete.\n");
+	}
 	spin_unlock(&IDR_LOCK);
 
-	if (map_ct == 0) {
-		int i;
-		struct acc_dlt temp;
-
-		printk("Last one must clean up.\n");
-		for (i = 0; i < WINDOW; i++)
-			windowCopy[i] = temp;
-	}
 	return 0;
 }
