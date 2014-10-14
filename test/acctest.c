@@ -9,8 +9,8 @@ int main(int argc, char **argv)
 {
 	int status;
 
-	forkEvent(200, 0, 0, 2);
-	forkEvent(0, 200, 0, 2);
+	forkEvent(200, 0, 0, 2, "horizontal event");
+	forkEvent(0, 200, 0, 2, "vertical event");
 	while (1) {
 		if (wait(&status) <= 0)
 			break;
@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq)
+void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq, char *message)
 {
 	int pid;
 
@@ -33,11 +33,9 @@ void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq)
 		int result;
 
 		result = syscall(379, &motionTest);
-		printf("acc_motion ID: %d\n", result);
 		syscall(380, result);
-		printf("%d detected a motion!\n", getpid());
+		printf("%d detected a %s!\n", getpid(), message);
 		syscall(382, result);
-		printf("Call destroy successfully.\n");
 		exit(0);
 	}
 }

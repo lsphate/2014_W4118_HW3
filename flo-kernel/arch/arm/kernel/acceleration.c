@@ -13,7 +13,7 @@
 #include <linux/types.h>
 
 int map_init, map_ct, numSamples;
-spinlock_t CREATE_LOCK;
+spinlock_t IDR_LOCK, WQ_LOCK;
 struct dev_acceleration data;
 struct acc_dlt sample, windowCopy[WINDOW];
 DEFINE_IDR(accmap);
@@ -77,12 +77,11 @@ SYSCALL_DEFINE1(accevt_create, struct acc_motion __user *, acceleration)
 	map_id = 0;
 
 map_retry:
+	spin_lock(&IDR_LOCK);
 	if (idr_pre_get(&accmap, GFP_KERNEL) == 0)
 		return -ENOMEM;
-
-	spin_lock(&CREATE_LOCK);
 	map_result = idr_get_new(&accmap, newacc, &map_id);
-	spin_unlock(&CREATE_LOCK);
+	spin_unlock(&IDR_LOCK);
 	if (map_result < 0) {
 		if (map_result == -EAGAIN)
 			goto map_retry;
@@ -115,11 +114,6 @@ int checkMotion_cb(int id, void *ptr, void *data)
 		}
 	}
 	/*printk("FRQ: %d\n", frq);*/
-	/*
-	 * TODO: instead of print statement
-	 * activate the processes waiting
-	 * on this event
-	 */
 	if (frq >= currMotion->user_acc.frq) {
 		printk("DETECTED MOTION!\n");
 		currMotion->condition = 1;
@@ -174,7 +168,9 @@ SYSCALL_DEFINE1(accevt_signal, struct dev_acceleration __user *, acceleration)
 			kfifo_out(&dltFifo, &tempDlt, 1);
 		kfifo_in(&dltFifo, &sample, 1);
 		numSamples = kfifo_out_peek(&dltFifo, windowCopy, WINDOW);
+		spin_lock(&IDR_LOCK);
 		idr_for_each(&accmap, &checkMotion_cb, windowCopy);
+		spin_unlock(&IDR_LOCK);
 	}
 	return 0;
 }
@@ -199,13 +195,13 @@ repeat_waiting:
 		for (;;) {
 			prepare_to_wait(&(temp->eventWQ),
 					&__wait, TASK_INTERRUPTIBLE);
-			spin_lock(&CREATE_LOCK);
+			spin_lock(&WQ_LOCK);
 			if (*isRunnable == 1) {
-				spin_unlock(&CREATE_LOCK);
+				spin_unlock(&WQ_LOCK);
 				check = 1;
 				break;
 			}
-			spin_unlock(&CREATE_LOCK);
+			spin_unlock(&WQ_LOCK);
 			if (!signal_pending(current)) {
 				schedule();
 				continue;
@@ -230,7 +226,7 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 	printk("Destroy starts.\n");
 	struct acc_motion_status *status_free;
 
-	spin_lock(&CREATE_LOCK);
+	spin_lock(&IDR_LOCK);
 	status_free = idr_find(&accmap, event_id);
 	printk("Get entities to remove.\n");
 
@@ -238,7 +234,7 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 	map_ct--;
 	kfree(status_free);
 	printk("Destroy complete.\n");
-	spin_unlock(&CREATE_LOCK);
+	spin_unlock(&IDR_LOCK);
 
 	if (map_ct == 0) {
 		int i;

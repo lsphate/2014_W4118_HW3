@@ -3,7 +3,7 @@
 
 #include <linux/unistd.h>
 
-void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq);
+void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq, char *message);
 
 struct acc_motion {
 
