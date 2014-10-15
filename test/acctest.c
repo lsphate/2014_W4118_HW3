@@ -9,9 +9,9 @@ int main(int argc, char **argv)
 {
 	int status;
 
-	forkEvent(200, 0, 0, 2, "horizontal shake");
-	forkEvent(0, 200, 0, 2, "vertical shake");
-	forkEvent(15, 15, 15, 2, "shake");
+	forkEvent(200, 0, 0, 10, "horizontal shake");
+	forkEvent(0, 200, 0, 10, "vertical shake");
+	forkEvent(15, 15, 15, 10, "shake");
 	while (1) {
 		if (wait(&status) <= 0)
 			break;

@@ -5,6 +5,14 @@ UNIs: aas2215, hc2751, sl3833
 
 We have two deamon programs in acceleration_d, which are accelerationd_part2.c specifically for question 2 and  accelerationd.c for the rest. 
 In the deamon programs, we poll the sensor data and call system call signal to send the signal data into the kernel to set up acc_motion event.
+
+We used the following resources to figure out how to createa daemon:
+http://www.wordptr.com/2011/01/31/lets-write-a-linux-daemon-part-i/
+http://www.faqs.org/faqs/unix-faq/programmer/faq/
+http://www.danielhall.me/2010/01/writing-a-daemon-in-c/
+http://shahmirj.com/blog/beginners-guide-to-creating-a-daemon-in-linux
+
+
 We write our test program acctest in test directory. In the test program, we first define three acc_motion events for vertical shake, horizontal shake 
 and shake. We then write a forkEvent function to fork the process, create acc_motion event and call system calls. The order in the in the forkEvent is : 
 define acc_motion event --> call system call create (create acc_motion event and store it in the kernel) -->call system call wait (wait for trigger sample)
