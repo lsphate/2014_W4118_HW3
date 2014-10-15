@@ -228,7 +228,6 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 		if(atomic_read(&(status_free->numProc))) {
 			status_free->condition = 1;
 			wake_up(&(status_free->eventWQ));
-			while(atomic_read(&(status_free->numProc)));
 		}
 		idr_remove(&accmap, event_id);
 		kfree(status_free);
