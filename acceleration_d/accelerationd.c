@@ -196,8 +196,8 @@ static void enumerate_sensors(const struct sensors_module_t *sensors)
 	}
 
 	for (s = 0; s < nr; s++) {
-		printf("%s (%s) v%d\n\tHandle:%d, type:%d, max:%0.2f,
-			resolution:%0.2f\n", slist[s].name, slist[s].vendor,
+		printf("%s (%s) v%d\n\tHandle:%d, type:%d, max:%0.2f, "
+			"resolution:%0.2f\n", slist[s].name, slist[s].vendor,
 			slist[s].version, slist[s].handle, slist[s].type,
 			slist[s].maxRange, slist[s].resolution);
 
