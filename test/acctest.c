@@ -9,8 +9,9 @@ int main(int argc, char **argv)
 {
 	int status;
 
-	forkEvent(200, 0, 0, 2, "horizontal event");
-	forkEvent(0, 200, 0, 2, "vertical event");
+	forkEvent(200, 0, 0, 2, "horizontal shake");
+	forkEvent(0, 200, 0, 2, "vertical shake");
+	forkEvent(15, 15, 15, 2, "shake");
 	while (1) {
 		if (wait(&status) <= 0)
 			break;
@@ -21,7 +22,7 @@ int main(int argc, char **argv)
 void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq, char *message)
 {
 	int pid;
-
+	int result=0;
 	pid = fork();
 	if (pid < 0) {
 		exit(EXIT_FAILURE);
@@ -30,9 +31,10 @@ void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq, char *message)
 			.dlt_x = dlt_x, .dlt_y = dlt_y,
 			.dlt_z = dlt_z, .frq = frq
 		};
-		int result;
 
 		result = syscall(379, &motionTest);
+		printf("created event %d\n", result);
+		printf("waiting on %d\n", result);
 		syscall(380, result);
 		printf("%d detected a %s!\n", getpid(), message);
 		syscall(382, result);
