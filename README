@@ -1,0 +1,28 @@
+
+homework 3
+
+UNIs: aas2215, hc2751, sl3833
+
+We have two deamon programs in acceleration_d, which are accelerationd_part2.c specifically for question 2 and  accelerationd.c for the rest. 
+In the deamon programs, we poll the sensor data and call system call signal to send the signal data into the kernel to set up acc_motion event.
+We write our test program acctest in test directory. In the test program, we first define three acc_motion events for vertical shake, horizontal shake 
+and shake. We then write a forkEvent function to fork the process, create acc_motion event and call system calls. The order in the in the forkEvent is : 
+define acc_motion event --> call system call create (create acc_motion event and store it in the kernel) -->call system call wait (wait for trigger sample)
+-->call system destroy(destroy events that have been triggered). We uses child processes to do all the tasks and let parent to wait for all of them.
+In flo-kernel/arch/arm/kernel/acceleration.c, where all our system calls are defined and coded, contains five system calls and a function call. 
+All the system calls are designed according to the homework instruction, we list our special design for each one.
+1. set_acceleration : just a simple system call for question 2 that recieves signals from deamon
+2. accevt_create : Once the test program call create, we pass in the acc_motion event and store in the idr map structure in the kernel and also initialize
+		   the wait_queue_head defined in each acc_motion event.
+3. accevt_signal : This system call is called by the deamon whenever a new signal is detected and need to pass to the kernel. Once we recieve the signal, we
+		   calculate its dlt value and strength with the former signal and store them using KFIFO dltFifo and then copy to windowCopy which is an 
+		   acc_dlt (a structure designed for the samples) array with size WINDOW. We then pass the windowCopy to the function idr_for_each which will
+		   go through all the acc_motion event we have stored to see if any of them can be triggered. In idr_for_each, we have to use call back 
+		   function which is checkMotion_cb to compare through the acc_motion lists and wakeup any events that are triggered. 
+4. accevt_wait : After calling accevt_create, the processes then call this system call and start waiting. Once the trigger condition is changed and wakeup 
+		 is called by the funciton call checkMotion_cb, we stop waiting.
+5. accevt_destroy : Once the process is triggered, the test program call destroy to destroy the acc_motion event in the map in the kernel. In here, we 
+		    have a int numProc to record if all the processes waiting for this acc_motion event have been waken. If they did, we then destory the
+		    acc_motion event from the list.
+   
+ 
