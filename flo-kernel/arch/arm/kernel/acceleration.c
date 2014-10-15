@@ -224,8 +224,8 @@ SYSCALL_DEFINE1(accevt_destroy, int, event_id)
 
 	spin_lock(&IDR_LOCK);
 	status_free = idr_find(&accmap, event_id);
-	if(status_free) {
-		if(atomic_read(&(status_free->numProc))) {
+	if (status_free) {
+		if (atomic_read(&(status_free->numProc))) {
 			status_free->condition = 1;
 			wake_up(&(status_free->eventWQ));
 		}

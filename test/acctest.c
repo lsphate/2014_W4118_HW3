@@ -22,7 +22,8 @@ int main(int argc, char **argv)
 void forkEvent(int dlt_x, int dlt_y, int dlt_z, int frq, char *message)
 {
 	int pid;
-	int result=0;
+	int result = 0;
+
 	pid = fork();
 	if (pid < 0) {
 		exit(EXIT_FAILURE);
